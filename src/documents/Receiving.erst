@@ -1,0 +1,42 @@
+@[Alias = "Приемка"]
+type Receiving of Document {
+    client function DocumentEditResult Edit(User currentUser, UserGroup currentGroup) {
+        Menu(
+            Buttons = [
+                new Control {
+                    DisplayText = "Прием товара",
+                    Action = _receive,
+                },
+                new Control {
+                    DisplayText = "Настройки",
+                    Action = _settings,
+                },
+                new Control {
+                    DisplayText = "Выйти",
+                    Action = _exit,
+                }
+            ],
+        )
+        on _receive {
+            EditField(
+                WelcomeText = "Введите номер пломбы:",
+                EditType = FieldEditType.DocumentField,
+                Field = SealNumber
+            )
+            ProcessContainer()
+            ScanAndSearch(
+                WelcomeText = "Отсканируйте штрихкод товара:",
+                NotFoundErrorText = "Товар не найден",
+                UseOnlyDocumentInventoryItems = UseOnlyDocumentInventoryItems.YesForListBoxAndAction,
+                InventoryItemsListHeaderText = "Товары документа"
+            )
+            return DocumentEditResult.OK
+        }
+        on _settings {
+            return DocumentEditResult.OK
+        }
+        on _exit {
+            return DocumentEditResult.Release
+        }
+    }
+}
