@@ -1,0 +1,49 @@
+client function bool ConfirmTemporaryExit()
+{
+    string exitPassword = ""
+    bool passwordEntryCancelled = false
+    EditField(
+        WelcomeText = "Введите пароль начальника смены:",
+        EditType = FieldEditType.Session,
+        Field = exitPassword,
+        CancelText = "Назад",
+        Controls = [new Control{DisplayText = "Назад", Action = _cancelPassword, Key = Keys.Escape}]
+    )
+    on _cancelPassword {
+        passwordEntryCancelled = true
+    }
+    if (passwordEntryCancelled || exitPassword == "") {
+        return false
+    }
+
+    if (exitPassword == "2408") {
+        return true
+    }
+
+    Alert(Message = "Неверный пароль")
+    return false
+}
+
+client function string SelectReceivingMenuAction()
+{
+    string selectedAction = ""
+    Menu(
+        Buttons = [
+            new Control{DisplayText = "Прием товара", Action = _receive},
+            new Control{DisplayText = "Настройки", Action = _settings},
+            new Control{DisplayText = "Выйти", Action = _exit, Key = Keys.Escape}
+        ],
+        CancelText = "Выйти"
+    )
+    on _receive {
+        selectedAction = "receive"
+    }
+    on _settings {
+        selectedAction = "settings"
+    }
+    on _exit {
+        selectedAction = "exit"
+    }
+
+    return selectedAction
+}

@@ -1,6 +1,17 @@
-expand Document {
+expand Document
+{
     string SealNumber
-    expand DocumentItem {
+
+    expand InventoryItemRecord
+    {
+        string BatchNumber
+        string BoxBarcode
+    }
+
+    expand DocumentItem
+    {
         string PartNumber
+        string BatchNumber
+        string BoxBarcode
     }
 }
