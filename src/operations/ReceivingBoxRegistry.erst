@@ -1,0 +1,100 @@
+server function bool RegisterReceivingBox(string documentId, string boxBarcode, int capacity)
+{
+    if (documentId == "" || boxBarcode == "") {
+        fail
+    }
+
+    ReceivingBoxes.Row activeBox = ReceivingBoxes.FindActive(documentId)
+    if (activeBox != null && activeBox.BoxBarcode != boxBarcode) {
+        return false
+    }
+
+    ReceivingBoxes.Row box = ReceivingBoxes.Find(documentId, boxBarcode)
+    if (box != null) {
+        return box.Status == ReceivingBoxStatus.InProgress
+    }
+
+    if (capacity <= 0) {
+        capacity = 10
+    }
+
+    box = new ReceivingBoxes.Row()
+    box.DocumentId = documentId
+    box.BoxBarcode = boxBarcode
+    box.Status = ReceivingBoxStatus.InProgress
+    box.Capacity = capacity
+    box.OccupiedPlaces = 0
+    ReceivingBoxes.Add(box)
+
+    return true
+}
+
+server function string GetActiveReceivingBoxBarcode(string documentId)
+{
+    if (documentId == "") {
+        fail
+    }
+
+    ReceivingBoxes.Row activeBox = ReceivingBoxes.FindActive(documentId)
+    if (activeBox == null) {
+        return ""
+    }
+
+    return activeBox.BoxBarcode
+}
+
+server function bool SetReceivingBoxCapacity(
+    string documentId,
+    string boxBarcode,
+    int capacity
+)
+{
+    ReceivingBoxes.Row box = ReceivingBoxes.Find(documentId, boxBarcode)
+    if (box == null || box.Status != ReceivingBoxStatus.InProgress) {
+        return false
+    }
+
+    if (box.OccupiedPlaces != 0 || capacity <= 0) {
+        return false
+    }
+
+    box.Capacity = capacity
+    return true
+}
+
+server function ReceivingBoxStatus OccupyReceivingBoxPlace(
+    string documentId,
+    string boxBarcode
+)
+{
+    ReceivingBoxes.Row box = ReceivingBoxes.Find(documentId, boxBarcode)
+    if (box == null || box.Status != ReceivingBoxStatus.InProgress) {
+        fail
+    }
+
+    if (box.OccupiedPlaces >= box.Capacity) {
+        fail
+    }
+
+    box.OccupiedPlaces = box.OccupiedPlaces + 1
+    if (box.OccupiedPlaces >= box.Capacity) {
+        box.Status = ReceivingBoxStatus.Filled
+    }
+
+    return box.Status
+}
+
+server function bool CloseReceivingBoxManually(string documentId, string boxBarcode)
+{
+    ReceivingBoxes.Row box = ReceivingBoxes.Find(documentId, boxBarcode)
+    if (box == null || box.Status != ReceivingBoxStatus.InProgress) {
+        return false
+    }
+
+    if (box.Capacity < 2 || box.OccupiedPlaces != box.Capacity - 2) {
+        return false
+    }
+
+    box.Status = ReceivingBoxStatus.ClosedManually
+    return true
+}

@@ -1,0 +1,31 @@
+client function Container SelectReceivingBox(string documentId)
+{
+    while (true) {
+        string activeBoxBarcode = GetActiveReceivingBoxBarcode(documentId)
+        on fail {
+            Alert(Message = "Не удалось получить текущую коробку")
+            return null
+        }
+
+        Container currentBox = ProcessContainer()
+        if (currentBox == null) {
+            return null
+        }
+        if (activeBoxBarcode != "" && currentBox.Barcode != activeBoxBarcode) {
+            Alert(Message = "Сначала продолжите текущую коробку: " + activeBoxBarcode)
+            continue
+        }
+
+        bool boxIsAvailable = RegisterReceivingBox(documentId, currentBox.Barcode, 10)
+        on fail {
+            Alert(Message = "Не удалось сохранить коробку")
+            continue
+        }
+        if (boxIsAvailable == false) {
+            Alert(Message = "Новая коробка недоступна, пока текущая не заполнена или не закрыта")
+            continue
+        }
+
+        return currentBox
+    }
+}

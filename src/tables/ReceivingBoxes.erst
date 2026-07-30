@@ -1,0 +1,31 @@
+enum ReceivingBoxStatus
+{
+    InProgress
+    Filled
+    ClosedManually
+}
+
+type ReceivingBoxes of Table
+{
+    @[PrimaryKey = true]
+    string DocumentId
+
+    @[PrimaryKey = true]
+    string BoxBarcode
+
+    ReceivingBoxStatus Status = ReceivingBoxStatus.InProgress
+    int Capacity = 10
+    int OccupiedPlaces = 0
+
+    static function ReceivingBoxes.Row Find(string targetDocumentId, string targetBoxBarcode)
+    {
+        return select first box from ReceivingBoxes
+            where box.DocumentId == targetDocumentId && box.BoxBarcode == targetBoxBarcode
+    }
+
+    static function ReceivingBoxes.Row FindActive(string targetDocumentId)
+    {
+        return select first box from ReceivingBoxes
+            where box.DocumentId == targetDocumentId && box.Status == ReceivingBoxStatus.InProgress
+    }
+}

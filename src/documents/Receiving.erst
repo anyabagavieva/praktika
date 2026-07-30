@@ -1,42 +1,150 @@
-@[Alias = "Приемка"]
-type Receiving of Document {
-    client function DocumentEditResult Edit(User currentUser, UserGroup currentGroup) {
-        Menu(
-            Buttons = [
-                new Control {
-                    DisplayText = "Прием товара",
-                    Action = _receive,
-                },
-                new Control {
-                    DisplayText = "Настройки",
-                    Action = _settings,
-                },
-                new Control {
-                    DisplayText = "Выйти",
-                    Action = _exit,
+@[Alias = "Приемка", ClientCreating = false, ShowDocumentsFromServerInList = true]
+type Receiving of Document
+{
+    client function DocumentEditResult Edit(User currentUser, UserGroup currentGroup)
+    {
+        while (true) {
+            string selectedMenuAction = SelectReceivingMenuAction()
+            if (selectedMenuAction == "") {
+                if (ConfirmTemporaryExit()) {
+                    return DocumentEditResult.Abort
                 }
-            ],
-        )
-        on _receive {
-            EditField(
-                WelcomeText = "Введите номер пломбы:",
-                EditType = FieldEditType.DocumentField,
-                Field = SealNumber
-            )
-            ProcessContainer()
-            ScanAndSearch(
-                WelcomeText = "Отсканируйте штрихкод товара:",
-                NotFoundErrorText = "Товар не найден",
-                UseOnlyDocumentInventoryItems = UseOnlyDocumentInventoryItems.YesForListBoxAndAction,
-                InventoryItemsListHeaderText = "Товары документа"
-            )
-            return DocumentEditResult.OK
-        }
-        on _settings {
-            return DocumentEditResult.OK
-        }
-        on _exit {
-            return DocumentEditResult.Release
+                continue
+            }
+
+            if (selectedMenuAction == "receive") {
+                string enteredSealNumber = this.SealNumber
+                bool sealEntryCancelled = false
+                if (enteredSealNumber == "") {
+                    EditField(
+                        WelcomeText = "Введите номер пломбы:",
+                        EditType = FieldEditType.Session,
+                        Field = enteredSealNumber,
+                        CancelText = "Назад",
+                        Controls = [new Control{DisplayText = "Назад", Action = _cancelSeal, Key = Keys.Escape}]
+                    )
+                    on _cancelSeal {
+                        sealEntryCancelled = true
+                    }
+                }
+                if (sealEntryCancelled || enteredSealNumber == "") {
+                    continue
+                }
+                this.SealNumber = enteredSealNumber
+
+                DocumentItemCollection workingExpectedLines = this.ExpectedLines
+                Container currentBox = SelectReceivingBox(this.Id)
+                if (currentBox == null) {
+                    continue
+                }
+                while (true) {
+                    if (workingExpectedLines.Completed) {
+                        Alert(Message = "Задание полностью собрано")
+                        return DocumentEditResult.OK
+                    }
+
+                    InventoryItemCollection documentInventoryItems = workingExpectedLines.InventoryItems
+                    if (documentInventoryItems.Count == 0) {
+                        Alert(Message = "В задании нет товаров")
+                        break
+                    }
+
+                    bool productScanCancelled = false
+                    (InventoryItemRecord selectedProduct, string _1, BarcodeData _2) = ScanAndSearch(
+                        WelcomeText = "Отсканируйте штрихкод товара:",
+                        NotFoundErrorText = "Товар не найден",
+                        UseOnlyDocumentInventoryItems = UseOnlyDocumentInventoryItems.No,
+                        SearchingInventoryItems = documentInventoryItems,
+                        InventoryItemsListHeaderText = "Товары документа",
+                        CancelText = "Назад",
+                        Controls = [new Control{DisplayText = "Назад", Action = _cancelProduct, Key = Keys.Escape}]
+                    )
+                    on _cancelProduct {
+                        productScanCancelled = true
+                    }
+                    on fail {
+                        productScanCancelled = true
+                    }
+                    if (productScanCancelled) {
+                        break
+                    }
+                    if (selectedProduct == null) {
+                        continue
+                    }
+
+                    string batchNumber = ""
+                    bool batchEntryCancelled = false
+                    EditField(
+                        WelcomeText = "Введите номер партии:",
+                        EditType = FieldEditType.Session,
+                        Field = batchNumber,
+                        CancelText = "Назад",
+                        Controls = [new Control{DisplayText = "Назад", Action = _cancelBatch, Key = Keys.Escape}]
+                    )
+                    on _cancelBatch {
+                        batchEntryCancelled = true
+                    }
+                    if (batchEntryCancelled || batchNumber == "") {
+                        continue
+                    }
+                    selectedProduct.BatchNumber = batchNumber
+                    selectedProduct.BoxBarcode = currentBox.Barcode
+                    selectedProduct.Quantity = 1
+
+                    (DocumentItemCollection changedActualLines, DocumentItemCollection _3) = CommitInventoryRecord(
+                        CheckQuantity = true,
+                        ErrorQuantityMessage = "Количество товара превышает задание",
+                        NoInventoryItemInDocumentMessage = "Товар отсутствует в задании",
+                        ComparingFieldNames = ["InventoryItemId", "UnitOfMeasureId"],
+                        ComparingFieldNamesForActualLines = [
+                            "InventoryItemId",
+                            "UnitOfMeasureId",
+                            "BatchNumber",
+                            "BoxBarcode"
+                        ],
+                        CheckDocumentInfill = true,
+                        CombineEqualActualLines = true,
+                        ExpectedLines = workingExpectedLines
+                    )
+                    on fail {
+                        continue
+                    }
+                    if (changedActualLines == null || changedActualLines.Count == 0) {
+                        Alert(Message = "Товар не был сохранен")
+                        continue
+                    }
+
+                    ReceivingBoxStatus boxStatus = OccupyReceivingBoxPlace(this.Id, currentBox.Barcode)
+                    on fail {
+                        Alert(Message = "Не удалось обновить заполнение коробки")
+                        break
+                    }
+
+                    if (workingExpectedLines.Completed) {
+                        Alert(Message = "Задание полностью собрано")
+                        return DocumentEditResult.OK
+                    }
+
+                    if (boxStatus == ReceivingBoxStatus.Filled) {
+                        Alert(Message = "Коробка заполнена. Закройте ее и отсканируйте следующую.")
+                        currentBox = SelectReceivingBox(this.Id)
+                        if (currentBox == null) {
+                            break
+                        }
+                    }
+                }
+                continue
+            }
+            if (selectedMenuAction == "settings") {
+                Alert(Message = "Настройки пока не реализованы")
+                continue
+            }
+            if (selectedMenuAction == "exit") {
+                if (ConfirmTemporaryExit()) {
+                    return DocumentEditResult.Abort
+                }
+                continue
+            }
         }
     }
 }

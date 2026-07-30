@@ -1,44 +1,13 @@
-expand Container {
+expand Container
+{
     string Extension
     string Code
     bool IsBox {
         this.Extension == "1"
     }
 }
+
 @[Barcode = "00{Extension:1}{Code:4}"]
-type Box of Container {
-}
-
-client function Container ScanContainer() {
-    string Barcode
-    EditField(WelcomeText = "Отсканируйте коробку:", EditType = FieldEditType.Session, Field = Barcode)
-    var bc = GO.GetBarcodeData(Barcode)
-    Container selectedBox = select first from Containers where Item.Barcode == bc.BarcodeRaw
-    if (selectedBox == null) {
-        GO.ShowErrorBaloon(text = "Коробка не найдена", delay = 3000, down = true)
-        fail
-    }
-    else {
-        if (selectedBox.IsBox == false) {
-            GO.ShowErrorBaloon(text = "Контейнер не является коробкой", delay = 3000, down = true)
-            fail
-        }
-    }
-
-    return selectedBox
-}
-
-client function Container ProcessContainer() {
-    Container curBox = null
-    while (true) {
-        var scanResult = ScanContainer()
-        on fail {
-            continue
-        }
-        if (scanResult != null) {
-            curBox = scanResult
-            break
-        }
-    }
-    return curBox
+type Box of Container
+{
 }

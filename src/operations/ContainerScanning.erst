@@ -1,0 +1,39 @@
+client function Container ScanContainer()
+{
+    while (true) {
+        string Barcode = ""
+        bool boxScanCancelled = false
+        EditField(
+            WelcomeText = "Отсканируйте коробку:",
+            EditType = FieldEditType.Session,
+            Field = Barcode,
+            CancelText = "Назад",
+            Controls = [new Control{DisplayText = "Назад", Action = _cancelBox, Key = Keys.Escape}]
+        )
+        on _cancelBox {
+            boxScanCancelled = true
+        }
+        if (boxScanCancelled || Barcode == "") {
+            return null
+        }
+
+        var bc = GO.GetBarcodeData(Barcode)
+        Container selectedBox = select first from Containers
+            where Item.Barcode == bc.BarcodeRaw
+        if (selectedBox == null) {
+            Alert(Message = "Коробка не найдена")
+            continue
+        }
+        if (selectedBox.IsBox == false) {
+            Alert(Message = "Контейнер не является коробкой")
+            continue
+        }
+
+        return selectedBox
+    }
+}
+
+client function Container ProcessContainer()
+{
+    return ScanContainer()
+}
