@@ -29,9 +29,19 @@ client function string SelectReceivingMenuAction()
     string selectedAction = ""
     Menu(
         Buttons = [
-            new Control{DisplayText = "Прием товара", Action = _receive},
-            new Control{DisplayText = "Настройки", Action = _settings},
-            new Control{DisplayText = "Выйти", Action = _exit, Key = Keys.Escape}
+            new Control{
+                DisplayText = "Прием товара",
+                Action = _receive
+            },
+            new Control{
+                DisplayText = "Настройки",
+                Action = _settings,
+            },
+            new Control{
+                DisplayText = "Выйти",
+                Action = _exit,
+                Key = Keys.Escape
+            }
         ],
         CancelText = "Выйти"
     )
