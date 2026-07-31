@@ -3,6 +3,7 @@ type Receiving of Document
 {
     client function DocumentEditResult Edit(User currentUser, UserGroup currentGroup)
     {
+        Document.DocumentItemCollection scannedItems = this.ActualLines
         while (true) {
             string selectedMenuAction = SelectReceivingMenuAction()
             if (selectedMenuAction == "") {
@@ -136,7 +137,40 @@ type Receiving of Document
                 continue
             }
             if (selectedMenuAction == "settings") {
-                Alert(Message = "Настройки пока не реализованы")
+                //Alert(Message = "Настройки пока не реализованы")
+                Menu(
+                    Buttons = [
+                        new Control{
+                            DisplayText = "Глубина коробок",
+                            Action = _boxDepth,
+                            Enabled = (scannedItems.Count == 0),
+                        }
+                    ],
+                    Controls = [
+                        new Control{
+                            Key = Keys.A,
+                            Action = _goBack
+                        }
+                    ]
+                )
+                on _goBack {
+                    back
+                }
+                on _boxDepth {
+                    int newDepth = CustomSettings.GetField("boxDepth")
+                    EditField(
+                        WelcomeText = "Введите новую глубину коробок",
+                        EditType = FieldEditType.Session,
+                        Field = newDepth,
+                        Controls = [
+                            new Control{
+                                Key = Keys.Escape,
+                                Action = back
+                            }
+                        ],
+                    )
+                    CustomSettings.SetField(fieldName = "boxDepth", value = newDepth)
+                }
                 continue
             }
             if (selectedMenuAction == "exit") {

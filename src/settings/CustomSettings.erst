@@ -1,0 +1,4 @@
+type changeDepth of Settings {
+    @[DeviceAccessibility = ReadWrite]
+    int boxDepth = 10
+}
