@@ -1,0 +1,118 @@
+client function ViewReceivingProducts(
+    DocumentItemCollection expectedLines,
+    DocumentItemCollection actualLines
+)
+{
+    if (expectedLines.Count == 0) {
+        Alert(Message = "В документе нет товаров")
+        return
+    }
+
+    while (true) {
+        DocumentItem selectedProduct = null
+        bool productListCancelled = false
+        (string _1, BarcodeData _2) = ShowItems(
+            DataSource = expectedLines,
+            SelectedItem = selectedProduct,
+            Title = "Товары документа",
+            WelcomeText = "Выберите товар для просмотра",
+            Columns = [
+                new ItemsColumn{
+                    Title = "Товар",
+                    Format = "{Item.InventoryItemName}",
+                    Align = ContentAlignment.MiddleLeft,
+                    AllBorder = 1,
+                    Width = new Length{Value = 64, Units = LengthUnits.Percents}
+                },
+                new ItemsColumn{
+                    Title = "Принято",
+                    Format = "{Item.ActualQuantityString}",
+                    Align = ContentAlignment.MiddleCenter,
+                    AllBorder = 1,
+                    Width = new Length{Value = 18, Units = LengthUnits.Percents}
+                },
+                new ItemsColumn{
+                    Title = "План",
+                    Format = "{Item.ExpectedQuantityString}",
+                    Align = ContentAlignment.MiddleCenter,
+                    AllBorder = 1,
+                    Width = new Length{Value = 18, Units = LengthUnits.Percents}
+                }
+            ],
+            SaveInHistory = false,
+            CancelText = "Назад",
+            Controls = [new Control{DisplayText = "Назад", Action = _cancelProductView, Key = Keys.Escape}]
+        )
+        on _cancelProductView {
+            productListCancelled = true
+        }
+
+        if (productListCancelled) {
+            return
+        }
+        if (selectedProduct == null) {
+            continue
+        }
+
+        DocumentItemCollection productActualLines = select from actualLines
+            where Item.InventoryItemId == selectedProduct.InventoryItemId && \
+                Item.UnitOfMeasureId == selectedProduct.UnitOfMeasureId
+
+        if (productActualLines.Count == 0) {
+            Alert(Message = "Этот товар еще не принят")
+            continue
+        }
+
+        ViewReceivingProductPlacements(selectedProduct, productActualLines)
+    }
+}
+
+client function ViewReceivingProductPlacements(
+    DocumentItem selectedProduct,
+    DocumentItemCollection productActualLines
+)
+{
+    while (true) {
+        DocumentItem selectedPlacement = null
+        bool placementListCancelled = false
+        (string _3, BarcodeData _4) = ShowItems(
+            DataSource = productActualLines,
+            SelectedItem = selectedPlacement,
+            Title = selectedProduct.InventoryItemName,
+            WelcomeText = "Распределение товара",
+            Columns = [
+                new ItemsColumn{
+                    Title = "Коробка",
+                    Format = "{Item.BoxBarcode}",
+                    Align = ContentAlignment.MiddleLeft,
+                    AllBorder = 1,
+                    Width = new Length{Value = 38, Units = LengthUnits.Percents}
+                },
+                new ItemsColumn{
+                    Title = "Партия",
+                    Format = "{Item.BatchNumber}",
+                    Align = ContentAlignment.MiddleLeft,
+                    AllBorder = 1,
+                    Width = new Length{Value = 38, Units = LengthUnits.Percents}
+                },
+                new ItemsColumn{
+                    Title = "Количество",
+                    Format = "{Item.ActualQuantityString}",
+                    Align = ContentAlignment.MiddleCenter,
+                    AllBorder = 1,
+                    Width = new Length{Value = 24, Units = LengthUnits.Percents}
+                }
+            ],
+            SaveInHistory = false,
+            CancelText = "Назад",
+            Controls = [new Control{DisplayText = "Назад", Action = _cancelPlacementView, Key = Keys.Escape}]
+        )
+        on _cancelPlacementView {
+            placementListCancelled = true
+        }
+
+        if (placementListCancelled) {
+            return
+        }
+    }
+}

@@ -1,6 +1,9 @@
 expand Document
 {
     string SealNumber
+    int BoxDepth = ReceivingSettings.DefaultBoxDepth
+    bool ManualQuantityInput = ReceivingSettings.DefaultManualQuantityInput
+    bool ShowDocumentItemsDuringScan = ReceivingSettings.DefaultShowDocumentItemsDuringScan
 
     expand InventoryItemRecord
     {

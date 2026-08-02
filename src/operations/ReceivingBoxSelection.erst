@@ -1,4 +1,4 @@
-client function Container SelectReceivingBox(string documentId)
+client function Container SelectReceivingBox(string documentId, int boxDepth)
 {
     while (true) {
         string activeBoxBarcode = GetActiveReceivingBoxBarcode(documentId)
@@ -16,7 +16,7 @@ client function Container SelectReceivingBox(string documentId)
             continue
         }
 
-        bool boxIsAvailable = RegisterReceivingBox(documentId, currentBox.Barcode, 10)
+        bool boxIsAvailable = RegisterReceivingBox(documentId, currentBox.Barcode, boxDepth)
         on fail {
             Alert(Message = "Не удалось сохранить коробку")
             continue

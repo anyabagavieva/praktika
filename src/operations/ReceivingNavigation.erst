@@ -24,35 +24,109 @@ client function bool ConfirmTemporaryExit()
     return false
 }
 
-client function string SelectReceivingMenuAction()
+client function string SelectReceivingMenuAction(bool canCloseBox)
 {
     string selectedAction = ""
     Menu(
         Buttons = [
-            new Control{
-                DisplayText = "Прием товара",
-                Action = _receive
-            },
-            new Control{
-                DisplayText = "Настройки",
-                Action = _settings,
-            },
-            new Control{
-                DisplayText = "Выйти",
-                Action = _exit,
-                Key = Keys.Escape
-            }
+            new Control{DisplayText = "Прием товара", Action = _receive},
+            new Control{DisplayText = "Просмотр товаров", Action = _viewProducts},
+            new Control{DisplayText = "Закрыть текущую коробку", Action = _closeBox, Enabled = canCloseBox},
+            new Control{DisplayText = "Настройки", Action = _settings},
+            new Control{DisplayText = "Выйти", Action = _exit, Key = Keys.Escape}
         ],
         CancelText = "Выйти"
     )
     on _receive {
         selectedAction = "receive"
     }
+    on _viewProducts {
+        selectedAction = "viewProducts"
+    }
+    on _closeBox {
+        selectedAction = "closeBox"
+    }
     on _settings {
         selectedAction = "settings"
     }
     on _exit {
         selectedAction = "exit"
+    }
+
+    return selectedAction
+}
+
+client function string SelectReceivingSettingsAction(bool canChangeBoxDepth)
+{
+    string selectedAction = ""
+    Menu(
+        Buttons = [
+            new Control{DisplayText = "Глубина коробок", Action = _boxDepth, Enabled = canChangeBoxDepth},
+            new Control{DisplayText = "Режим количества", Action = _quantityMode},
+            new Control{DisplayText = "Режим работы", Action = _workMode}
+        ],
+        Controls = [new Control{DisplayText = "Назад", Action = _back, Key = Keys.Escape}],
+        CancelText = "Назад"
+    )
+    on _boxDepth {
+        selectedAction = "boxDepth"
+    }
+    on _quantityMode {
+        selectedAction = "quantityMode"
+    }
+    on _workMode {
+        selectedAction = "workMode"
+    }
+    on _back {
+        selectedAction = "back"
+    }
+
+    return selectedAction
+}
+
+client function string SelectReceivingQuantityModeAction()
+{
+    string selectedAction = ""
+    Menu(
+        Buttons = [
+            new Control{DisplayText = "Автоматически: 1 за сканирование", Action = _automatic},
+            new Control{DisplayText = "Вручную: вводить количество", Action = _manual}
+        ],
+        Controls = [new Control{DisplayText = "Назад", Action = _back, Key = Keys.Escape}],
+        CancelText = "Назад"
+    )
+    on _automatic {
+        selectedAction = "automatic"
+    }
+    on _manual {
+        selectedAction = "manual"
+    }
+    on _back {
+        selectedAction = "back"
+    }
+
+    return selectedAction
+}
+
+client function string SelectReceivingWorkModeAction()
+{
+    string selectedAction = ""
+    Menu(
+        Buttons = [
+            new Control{DisplayText = "Показывать список задания", Action = _showDocumentItems},
+            new Control{DisplayText = "Только сканирование", Action = _scanOnly}
+        ],
+        Controls = [new Control{DisplayText = "Назад", Action = _back, Key = Keys.Escape}],
+        CancelText = "Назад"
+    )
+    on _showDocumentItems {
+        selectedAction = "showDocumentItems"
+    }
+    on _scanOnly {
+        selectedAction = "scanOnly"
+    }
+    on _back {
+        selectedAction = "back"
     }
 
     return selectedAction

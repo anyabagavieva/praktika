@@ -8,9 +8,12 @@
 
 Файлы в `operations`:
 
-- `ReceivingNavigation.erst` — главное меню и подтверждение выхода.
+- `ReceivingNavigation.erst` — главное меню, настройки режимов и подтверждение выхода.
 - `ContainerScanning.erst` — сканирование и проверка коробки.
 - `ReceivingBoxSelection.erst` — выбор коробки для документа.
 - `ReceivingBoxRegistry.erst` — серверные операции над таблицей рабочих коробок.
+- `ReceivingQuantityInput.erst` — ручной ввод и проверка количества товара.
+- `ReceivingProductSelection.erst` — одновременное отображение задания и сканирование товара.
+- `ReceivingProductView.erst` — просмотр товаров документа и их распределения по коробкам и партиям.
 
 Основной цикл приемки остается в `documents/Receiving.erst`

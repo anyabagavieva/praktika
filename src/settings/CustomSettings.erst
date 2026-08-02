@@ -1,4 +1,14 @@
-type changeDepth of Settings {
-    @[DeviceAccessibility = ReadWrite]
-    int boxDepth = 10
+type ReceivingSettings of Settings
+{
+    @[DeviceAccessibility = Read]
+    @[ServerAccessibility = Read]
+    int DefaultBoxDepth = 10
+
+    @[DeviceAccessibility = Read]
+    @[ServerAccessibility = Read]
+    bool DefaultManualQuantityInput = false
+
+    @[DeviceAccessibility = Read]
+    @[ServerAccessibility = Read]
+    bool DefaultShowDocumentItemsDuringScan = false
 }
