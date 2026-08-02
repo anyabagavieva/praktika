@@ -3,9 +3,17 @@ type Receiving of Document
 {
     client function DocumentEditResult Edit(User currentUser, UserGroup currentGroup)
     {
-        Document.DocumentItemCollection scannedItems = this.ActualLines
         while (true) {
-            string selectedMenuAction = SelectReceivingMenuAction()
+            string activeBoxBarcodeForMenu = ""
+            bool activeBoxLookupFailedForMenu = false
+            activeBoxBarcodeForMenu = GetActiveReceivingBoxBarcode(this.Id)
+            on fail {
+                Alert(Message = "Не удалось проверить текущую коробку")
+                activeBoxLookupFailedForMenu = true
+            }
+
+            bool canCloseBox = !activeBoxLookupFailedForMenu && activeBoxBarcodeForMenu != ""
+            string selectedMenuAction = SelectReceivingMenuAction(canCloseBox)
             if (selectedMenuAction == "") {
                 if (ConfirmTemporaryExit()) {
                     return DocumentEditResult.Abort
@@ -34,7 +42,7 @@ type Receiving of Document
                 this.SealNumber = enteredSealNumber
 
                 DocumentItemCollection workingExpectedLines = this.ExpectedLines
-                Container currentBox = SelectReceivingBox(this.Id)
+                Container currentBox = SelectReceivingBox(this.Id, this.BoxDepth)
                 if (currentBox == null) {
                     continue
                 }
@@ -50,21 +58,42 @@ type Receiving of Document
                         break
                     }
 
-                    bool productScanCancelled = false
-                    (InventoryItemRecord selectedProduct, string _1, BarcodeData _2) = ScanAndSearch(
-                        WelcomeText = "Отсканируйте штрихкод товара:",
-                        NotFoundErrorText = "Товар не найден",
-                        UseOnlyDocumentInventoryItems = UseOnlyDocumentInventoryItems.No,
-                        SearchingInventoryItems = documentInventoryItems,
-                        InventoryItemsListHeaderText = "Товары документа",
-                        CancelText = "Назад",
-                        Controls = [new Control{DisplayText = "Назад", Action = _cancelProduct, Key = Keys.Escape}]
-                    )
-                    on _cancelProduct {
-                        productScanCancelled = true
-                    }
+                    int occupiedPlaces = 0
+                    int boxCapacity = 0
+                    (occupiedPlaces, boxCapacity) = GetReceivingBoxUsage(this.Id, currentBox.Barcode)
                     on fail {
-                        productScanCancelled = true
+                        Alert(Message = "Не удалось получить заполнение коробки")
+                        break
+                    }
+                    string currentBoxBarcode = currentBox.Barcode
+                    bool productScanCancelled = false
+                    InventoryItemRecord selectedProduct = null
+                    if (this.ShowDocumentItemsDuringScan) {
+                        (selectedProduct, productScanCancelled) = ScanReceivingProductWithDocumentList(
+                            workingExpectedLines,
+                            currentBoxBarcode,
+                            occupiedPlaces,
+                            boxCapacity
+                        )
+                    }
+                    else {
+                        (selectedProduct, string _1, BarcodeData _2) = ScanAndSearch(
+                            WelcomeText = "Отсканируйте штрихкод товара:",
+                            HeaderText = "Коробка {currentBoxBarcode}: занято {occupiedPlaces} из {boxCapacity} мест",
+                            SaveInHistory = false,
+                            NotFoundErrorText = "Товар не найден",
+                            UseOnlyDocumentInventoryItems = UseOnlyDocumentInventoryItems.No,
+                            SearchingInventoryItems = documentInventoryItems,
+                            InventoryItemsListHeaderText = "Товары документа",
+                            CancelText = "Назад",
+                            Controls = [new Control{DisplayText = "Назад", Action = _cancelProduct, Key = Keys.Escape}]
+                        )
+                        on _cancelProduct {
+                            productScanCancelled = true
+                        }
+                        on fail {
+                            productScanCancelled = true
+                        }
                     }
                     if (productScanCancelled) {
                         break
@@ -77,6 +106,8 @@ type Receiving of Document
                     bool batchEntryCancelled = false
                     EditField(
                         WelcomeText = "Введите номер партии:",
+                        HeaderText = "Коробка {currentBoxBarcode}: занято {occupiedPlaces} из {boxCapacity} мест",
+                        SaveInHistory = false,
                         EditType = FieldEditType.Session,
                         Field = batchNumber,
                         CancelText = "Назад",
@@ -88,9 +119,31 @@ type Receiving of Document
                     if (batchEntryCancelled || batchNumber == "") {
                         continue
                     }
+                    int receivedQuantity = 1
+                    if (this.ManualQuantityInput) {
+                        (bool quantityConfirmed, int enteredQuantity) = EnterReceivingQuantity(
+                            occupiedPlaces,
+                            boxCapacity
+                        )
+                        if (!quantityConfirmed) {
+                            continue
+                        }
+                        receivedQuantity = enteredQuantity
+                    }
+
+                    int remainingBoxPlaces = GetReceivingBoxRemainingPlaces(this.Id, currentBox.Barcode)
+                    on fail {
+                        Alert(Message = "Не удалось получить остаток мест в коробке")
+                        break
+                    }
+                    if (receivedQuantity > remainingBoxPlaces) {
+                        Alert(Message = "В коробке недостаточно свободных мест для такого количества")
+                        continue
+                    }
+
                     selectedProduct.BatchNumber = batchNumber
                     selectedProduct.BoxBarcode = currentBox.Barcode
-                    selectedProduct.Quantity = 1
+                    selectedProduct.Quantity = receivedQuantity
 
                     (DocumentItemCollection changedActualLines, DocumentItemCollection _3) = CommitInventoryRecord(
                         CheckQuantity = true,
@@ -108,6 +161,7 @@ type Receiving of Document
                         ExpectedLines = workingExpectedLines
                     )
                     on fail {
+                        Alert(Message = "Товар не добавлен: он отсутствует в задании или его количество уже полностью принято")
                         continue
                     }
                     if (changedActualLines == null || changedActualLines.Count == 0) {
@@ -115,11 +169,22 @@ type Receiving of Document
                         continue
                     }
 
-                    ReceivingBoxStatus boxStatus = OccupyReceivingBoxPlace(this.Id, currentBox.Barcode)
+                    ReceivingBoxStatus boxStatus = OccupyReceivingBoxPlace(
+                        this.Id,
+                        currentBox.Barcode,
+                        receivedQuantity
+                    )
                     on fail {
                         Alert(Message = "Не удалось обновить заполнение коробки")
                         break
                     }
+
+                    occupiedPlaces = occupiedPlaces + receivedQuantity
+                    GO.ShowBaloon(
+                        "Коробка {currentBoxBarcode}: занято {occupiedPlaces} из {boxCapacity} мест",
+                        3000,
+                        false
+                    )
 
                     if (workingExpectedLines.Completed) {
                         Alert(Message = "Задание полностью собрано")
@@ -128,7 +193,7 @@ type Receiving of Document
 
                     if (boxStatus == ReceivingBoxStatus.Filled) {
                         Alert(Message = "Коробка заполнена. Закройте ее и отсканируйте следующую.")
-                        currentBox = SelectReceivingBox(this.Id)
+                        currentBox = SelectReceivingBox(this.Id, this.BoxDepth)
                         if (currentBox == null) {
                             break
                         }
@@ -136,40 +201,102 @@ type Receiving of Document
                 }
                 continue
             }
-            if (selectedMenuAction == "settings") {
-                //Alert(Message = "Настройки пока не реализованы")
-                Menu(
-                    Buttons = [
-                        new Control{
-                            DisplayText = "Глубина коробок",
-                            Action = _boxDepth,
-                            Enabled = (scannedItems.Count == 0),
-                        }
-                    ],
-                    Controls = [
-                        new Control{
-                            Key = Keys.A,
-                            Action = _goBack
-                        }
-                    ]
-                )
-                on _goBack {
-                    back
+            if (selectedMenuAction == "viewProducts") {
+                ViewReceivingProducts(this.ExpectedLines, this.ActualLines)
+                continue
+            }
+            if (selectedMenuAction == "closeBox") {
+                string activeBoxBarcodeToClose = GetActiveReceivingBoxBarcode(this.Id)
+                on fail {
+                    Alert(Message = "Не удалось получить текущую коробку")
+                    continue
                 }
-                on _boxDepth {
-                    int newDepth = CustomSettings.GetField("boxDepth")
+
+                if (activeBoxBarcodeToClose == "") {
+                    Alert(Message = "Нет коробки, которую можно закрыть")
+                    continue
+                }
+
+                bool boxClosed = CloseReceivingBoxManually(this.Id, activeBoxBarcodeToClose)
+                if (boxClosed) {
+                    Alert(Message = "Текущая коробка закрыта. Можно изменить глубину и отсканировать следующую.")
+                }
+                else {
+                    Alert(Message = "Коробку можно закрыть только если в ней свободно ровно 2 грузовых места")
+                }
+                continue
+            }
+            if (selectedMenuAction == "settings") {
+                bool activeBoxLookupFailed = false
+                string activeBoxBarcode = GetActiveReceivingBoxBarcode(this.Id)
+                on fail {
+                    Alert(Message = "Не удалось получить текущую коробку")
+                    activeBoxLookupFailed = true
+                }
+                if (activeBoxLookupFailed) {
+                    continue
+                }
+
+                bool canChangeBoxDepth = activeBoxBarcode == ""
+                string selectedSettingsAction = SelectReceivingSettingsAction(canChangeBoxDepth)
+                if (selectedSettingsAction == "boxDepth") {
+                    int newDepth = this.BoxDepth
+                    bool boxDepthEntryCancelled = false
                     EditField(
                         WelcomeText = "Введите новую глубину коробок",
                         EditType = FieldEditType.Session,
                         Field = newDepth,
-                        Controls = [
-                            new Control{
-                                Key = Keys.Escape,
-                                Action = back
-                            }
-                        ],
+                        CancelText = "Назад",
+                        Controls = [new Control{DisplayText = "Назад", Key = Keys.Escape, Action = _cancelBoxDepth}]
                     )
-                    CustomSettings.SetField(fieldName = "boxDepth", value = newDepth)
+                    on _cancelBoxDepth {
+                        boxDepthEntryCancelled = true
+                    }
+
+                    if (!boxDepthEntryCancelled) {
+                        if (newDepth <= 0) {
+                            Alert(Message = "Глубина коробок должна быть больше нуля")
+                        }
+                        else {
+                            bool canSaveDepth = true
+                            string latestActiveBoxBarcode = GetActiveReceivingBoxBarcode(this.Id)
+                            on fail {
+                                Alert(Message = "Не удалось повторно проверить текущую коробку")
+                                canSaveDepth = false
+                            }
+
+                            if (canSaveDepth && latestActiveBoxBarcode != "") {
+                                Alert(Message = "Глубину нельзя изменить: текущая коробка уже находится в работе")
+                                canSaveDepth = false
+                            }
+
+                            if (canSaveDepth) {
+                                this.BoxDepth = newDepth
+                            }
+                        }
+                    }
+                }
+                if (selectedSettingsAction == "quantityMode") {
+                    string selectedQuantityMode = SelectReceivingQuantityModeAction()
+                    if (selectedQuantityMode == "automatic") {
+                        this.ManualQuantityInput = false
+                        Alert(Message = "Установлен автоматический режим количества")
+                    }
+                    if (selectedQuantityMode == "manual") {
+                        this.ManualQuantityInput = true
+                        Alert(Message = "Установлен ручной режим количества")
+                    }
+                }
+                if (selectedSettingsAction == "workMode") {
+                    string selectedWorkMode = SelectReceivingWorkModeAction()
+                    if (selectedWorkMode == "showDocumentItems") {
+                        this.ShowDocumentItemsDuringScan = true
+                        Alert(Message = "Список задания будет показан во время сканирования")
+                    }
+                    if (selectedWorkMode == "scanOnly") {
+                        this.ShowDocumentItemsDuringScan = false
+                        Alert(Message = "Установлен режим только сканирования")
+                    }
                 }
                 continue
             }

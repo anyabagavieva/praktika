@@ -1,0 +1,103 @@
+client function (InventoryItemRecord, bool) ScanReceivingProductWithDocumentList(
+    DocumentItemCollection expectedLines,
+    string currentBoxBarcode,
+    int occupiedPlaces,
+    int boxCapacity
+)
+{
+    while (true) {
+        string input = ""
+        bool scanCancelled = false
+        (DocumentItem selectedLine, string enteredValue, BarcodeData barcode) = EditField(
+            WelcomeText = "Отсканируйте штрихкод товара:",
+            HeaderText = "Коробка {currentBoxBarcode}: занято {occupiedPlaces} из {boxCapacity} мест",
+            EditType = FieldEditType.Session,
+            Field = input,
+            DataSource = expectedLines,
+            ShowList = expectedLines.Count > 0,
+            ShowEditBox = true,
+            ListCaption = "Содержимое задания",
+            Columns = [
+                new ItemsColumn{
+                    Title = "Товар",
+                    Format = "{Item.InventoryItemName}",
+                    Align = ContentAlignment.MiddleLeft,
+                    AllBorder = 1,
+                    Width = new Length{Value = 64, Units = LengthUnits.Percents}
+                },
+                new ItemsColumn{
+                    Title = "Принято",
+                    Format = "{Item.ActualQuantityString}",
+                    Align = ContentAlignment.MiddleCenter,
+                    AllBorder = 1,
+                    Width = new Length{Value = 18, Units = LengthUnits.Percents}
+                },
+                new ItemsColumn{
+                    Title = "План",
+                    Format = "{Item.ExpectedQuantityString}",
+                    Align = ContentAlignment.MiddleCenter,
+                    AllBorder = 1,
+                    Width = new Length{Value = 18, Units = LengthUnits.Percents}
+                }
+            ],
+            SaveInHistory = false,
+            CancelText = "Назад",
+            Controls = [
+                new Control{Barcode = "\{any\}", Action = _scanProduct},
+                new Control{DisplayText = "Назад", Action = _cancelProductList, Key = Keys.Escape}
+            ]
+        )
+        on _scanProduct {
+        }
+        on _cancelProductList {
+            scanCancelled = true
+        }
+        on return {
+            if (enteredValue != null && enteredValue != "") {
+                barcode = GO.GetBarcodeData(enteredValue)
+            }
+        }
+
+        if (scanCancelled) {
+            return null, true
+        }
+        if (barcode == null) {
+            if (selectedLine == null) {
+                continue
+            }
+
+            InventoryItemRecord selectedProductFromList = new InventoryItemRecord(
+                selectedLine.InventoryItemId,
+                selectedLine.UnitOfMeasureId
+            )
+            selectedProductFromList.InventoryItem = selectedLine.InventoryItem
+            selectedProductFromList.UnitOfMeasure = selectedLine.UnitOfMeasure
+            return selectedProductFromList, false
+        }
+
+        string searchBarcode = barcode.BarcodeRaw
+        InventoryItemCollection documentInventoryItems = expectedLines.InventoryItems
+        (InventoryItemRecord selectedProduct, string _1, BarcodeData _2) = ScanAndSearch(
+            ProcessSessionBarcode = true,
+            BarcodeSessionVariable = searchBarcode,
+            CanSelectCell = false,
+            CanSelectPallet = false,
+            BarcodeConvertion = StringConvertionType.None,
+            CanManualShowInventoryItemsList = false,
+            AutoShowSelectionList = false,
+            UseOnlyDocumentInventoryItems = UseOnlyDocumentInventoryItems.No,
+            SearchingInventoryItems = documentInventoryItems,
+            NotFoundErrorText = "Товар не найден",
+            PlayAudioOnError = true,
+            SaveInHistory = false
+        )
+        on fail {
+            continue
+        }
+        if (selectedProduct == null) {
+            continue
+        }
+
+        return selectedProduct, false
+    }
+}

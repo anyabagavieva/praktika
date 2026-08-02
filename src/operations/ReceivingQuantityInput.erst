@@ -1,0 +1,29 @@
+client function (bool, int) EnterReceivingQuantity(int occupiedPlaces, int boxCapacity)
+{
+    while (true) {
+        int enteredQuantity = 1
+        bool quantityEntryCancelled = false
+        EditField(
+            WelcomeText = "Введите количество товара:",
+            HeaderText = "Занято в коробке: {occupiedPlaces} из {boxCapacity} мест",
+            SaveInHistory = false,
+            EditType = FieldEditType.Session,
+            Field = enteredQuantity,
+            CancelText = "Назад",
+            Controls = [new Control{DisplayText = "Назад", Action = _cancelQuantity, Key = Keys.Escape}]
+        )
+        on _cancelQuantity {
+            quantityEntryCancelled = true
+        }
+
+        if (quantityEntryCancelled) {
+            return false, 0
+        }
+        if (enteredQuantity <= 0) {
+            Alert(Message = "Количество товара должно быть больше нуля")
+            continue
+        }
+
+        return true, enteredQuantity
+    }
+}

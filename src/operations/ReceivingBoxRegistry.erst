@@ -62,21 +62,42 @@ server function bool SetReceivingBoxCapacity(
     return true
 }
 
-server function ReceivingBoxStatus OccupyReceivingBoxPlace(
-    string documentId,
-    string boxBarcode
-)
+server function (int, int) GetReceivingBoxUsage(string documentId, string boxBarcode)
 {
     ReceivingBoxes.Row box = ReceivingBoxes.Find(documentId, boxBarcode)
     if (box == null || box.Status != ReceivingBoxStatus.InProgress) {
         fail
     }
 
-    if (box.OccupiedPlaces >= box.Capacity) {
+    return box.OccupiedPlaces, box.Capacity
+}
+
+server function int GetReceivingBoxRemainingPlaces(string documentId, string boxBarcode)
+{
+    ReceivingBoxes.Row box = ReceivingBoxes.Find(documentId, boxBarcode)
+    if (box == null || box.Status != ReceivingBoxStatus.InProgress) {
         fail
     }
 
-    box.OccupiedPlaces = box.OccupiedPlaces + 1
+    return box.Capacity - box.OccupiedPlaces
+}
+
+server function ReceivingBoxStatus OccupyReceivingBoxPlace(
+    string documentId,
+    string boxBarcode,
+    int places
+)
+{
+    ReceivingBoxes.Row box = ReceivingBoxes.Find(documentId, boxBarcode)
+    if (box == null || box.Status != ReceivingBoxStatus.InProgress || places <= 0) {
+        fail
+    }
+
+    if (box.OccupiedPlaces + places > box.Capacity) {
+        fail
+    }
+
+    box.OccupiedPlaces = box.OccupiedPlaces + places
     if (box.OccupiedPlaces >= box.Capacity) {
         box.Status = ReceivingBoxStatus.Filled
     }

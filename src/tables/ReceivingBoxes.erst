@@ -14,7 +14,7 @@ type ReceivingBoxes of Table
     string BoxBarcode
 
     ReceivingBoxStatus Status = ReceivingBoxStatus.InProgress
-    int Capacity = CustomSettings.GetField("boxDepth")
+    int Capacity = 10
     int OccupiedPlaces = 0
 
     static function ReceivingBoxes.Row Find(string targetDocumentId, string targetBoxBarcode)
